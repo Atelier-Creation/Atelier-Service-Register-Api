@@ -1,0 +1,22 @@
+const express = require('express');
+const cors = require('cors');
+const authRoutes = require('./routes/authRoutes');
+const jobRoutes = require('./routes/jobRoutes');
+const customerRoutes = require('./routes/customerRoutes');
+
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpecs = require('./config/swagger');
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+app.use('/api/auth', authRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/customers', customerRoutes);
+const vendorRoutes = require('./routes/vendorRoutes');
+app.use('/api/vendors', vendorRoutes);
+
+module.exports = app;
