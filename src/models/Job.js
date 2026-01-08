@@ -65,6 +65,14 @@ const jobSchema = new mongoose.Schema({
         cost: Number,
         date: Date,
     },
+    statusHistory: [{
+        status: String,
+        timestamp: {
+            type: Date,
+            default: Date.now
+        },
+        note: String
+    }],
 }, {
     timestamps: true,
 });

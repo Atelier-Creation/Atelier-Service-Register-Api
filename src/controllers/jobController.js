@@ -83,6 +83,11 @@ const createJob = async (req, res) => {
             advanceAmount,
             totalAmount,
             status,
+            statusHistory: [{
+                status: status || 'received',
+                timestamp: new Date(),
+                note: 'Order created'
+            }],
         });
 
         const createdJob = await job.save();
@@ -117,8 +122,24 @@ const updateJob = async (req, res) => {
         const job = await Job.findOne({ jobId: req.params.id });
 
         if (job) {
-            // Update fields (exclude immutable fields)
-            const { _id, jobId, createdAt, ...updates } = req.body;
+            // Update fields (exclude immutable fields and statusHistory which is handled separately)
+            const { _id, jobId, createdAt, statusHistory, ...updates } = req.body;
+
+            // Track status change
+            if (updates.status && updates.status !== job.status) {
+                const historyEntry = {
+                    status: updates.status,
+                    timestamp: new Date(),
+                    note: updates.note || `Status updated to ${updates.status}`
+                };
+
+                if (job.statusHistory) {
+                    job.statusHistory.push(historyEntry);
+                } else {
+                    job.statusHistory = [historyEntry];
+                }
+            }
+
             Object.assign(job, updates);
 
             const updatedJob = await job.save();
