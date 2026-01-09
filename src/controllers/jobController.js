@@ -60,7 +60,7 @@ const createJob = async (req, res) => {
                 .sort({ jobId: -1 })
                 .collation({ locale: "en_US", numericOrdering: true });
 
-            let nextNum = 1;
+            let nextNum = 101;
             if (lastJob && !isNaN(parseInt(lastJob.jobId))) {
                 nextNum = parseInt(lastJob.jobId) + 1;
             }
