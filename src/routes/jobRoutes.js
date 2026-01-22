@@ -52,70 +52,15 @@ const { protect, admin } = require('../middleware/authMiddleware');
  *       201:
  *         description: Job created successfully
  */
-router.route('/').get(protect, getJobs).post(protect, createJob);
+const upload = require('../middleware/uploadMiddleware');
+
+router.route('/').get(protect, getJobs).post(protect, upload.fields([{ name: 'beforeImages', maxCount: 5 }, { name: 'afterImages', maxCount: 5 }]), createJob);
 
 router.route('/stats/overview').get(protect, getJobStats);
 router.route('/stats/charts').get(protect, getDashboardCharts);
 router.route('/stats/outsource').get(protect, getOutsourceStats);
 router.route('/stats/reports').get(protect, admin, getDetailedReports);
 
-/**
- * @swagger
- * /api/jobs/{id}:
- *   get:
- *     summary: Get job by ID
- *     tags: [Jobs]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *         required: true
- *         description: Job ID
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Job details
- *       404:
- *         description: Job not found
- *   put:
- *     summary: Update a job
- *     tags: [Jobs]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *         required: true
- *         description: Job ID
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Job'
- *     responses:
- *       200:
- *         description: Job updated
- *   delete:
- *     summary: Delete a job
- *     tags: [Jobs]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *         required: true
- *         description: Job ID
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Job deleted
- */
-router.route('/:id').get(protect, getJobById).put(protect, updateJob).delete(protect, admin, deleteJob);
+router.route('/:id').get(protect, getJobById).put(protect, upload.fields([{ name: 'beforeImages', maxCount: 5 }, { name: 'afterImages', maxCount: 5 }]), updateJob).delete(protect, admin, deleteJob);
 
 module.exports = router;

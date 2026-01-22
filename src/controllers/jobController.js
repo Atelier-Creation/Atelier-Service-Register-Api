@@ -68,6 +68,16 @@ const createJob = async (req, res) => {
             jobId = nextNum.toString().padStart(3, '0');
         }
 
+        const images = { before: [], after: [] };
+        if (req.files) {
+            if (req.files.beforeImages) {
+                images.before = req.files.beforeImages.map(file => `/uploads/${file.filename}`);
+            }
+            if (req.files.afterImages) {
+                images.after = req.files.afterImages.map(file => `/uploads/${file.filename}`);
+            }
+        }
+
         const job = new Job({
             jobId,
             customerName,
@@ -88,6 +98,7 @@ const createJob = async (req, res) => {
                 timestamp: new Date(),
                 note: 'Order created'
             }],
+            images
         });
 
         const createdJob = await job.save();
@@ -138,6 +149,21 @@ const updateJob = async (req, res) => {
                 } else {
                     job.statusHistory = [historyEntry];
                 }
+            }
+
+            // Handle images
+            if (req.files) {
+                if (!job.images) job.images = { before: [], after: [] }; // Ensure structure exists
+
+                if (req.files.beforeImages) {
+                    const newImages = req.files.beforeImages.map(file => `/uploads/${file.filename}`);
+                    job.images.before = [...(job.images.before || []), ...newImages];
+                }
+                if (req.files.afterImages) {
+                    const newImages = req.files.afterImages.map(file => `/uploads/${file.filename}`);
+                    job.images.after = [...(job.images.after || []), ...newImages];
+                }
+                job.markModified('images');
             }
 
             Object.assign(job, updates);

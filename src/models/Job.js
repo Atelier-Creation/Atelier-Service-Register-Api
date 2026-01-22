@@ -18,6 +18,17 @@ const jobSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    type: {
+        type: String,
+        enum: ['walk-in', 'home-service'],
+        default: 'walk-in'
+    },
+    address: {
+        type: String, // Required for home-service
+    },
+    visitDate: {
+        type: Date, // Scheduled visit date for home-service
+    },
     deviceType: {
         type: String,
         required: true,
@@ -56,7 +67,7 @@ const jobSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['received', 'in-progress', 'waiting', 'ready', 'delivered', 'outsourced', 'cancelled'],
+        enum: ['received', 'in-progress', 'waiting', 'ready', 'delivered', 'outsourced', 'cancelled', 'returned'],
         default: 'received',
     },
     outsourced: {
@@ -73,6 +84,14 @@ const jobSchema = new mongoose.Schema({
         },
         note: String
     }],
+    images: {
+        before: [String],
+        after: [String]
+    },
+    warranty: {
+        type: String, // e.g., "3 Months", "No Warranty"
+        default: ""
+    },
 }, {
     timestamps: true,
 });
