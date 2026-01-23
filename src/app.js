@@ -21,5 +21,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/customers', customerRoutes);
 const vendorRoutes = require('./routes/vendorRoutes');
 app.use('/api/vendors', vendorRoutes);
+const settingsRoutes = require('./routes/settingsRoutes');
+app.use('/api/settings', settingsRoutes);
 
 module.exports = app;

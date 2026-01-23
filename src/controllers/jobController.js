@@ -6,8 +6,45 @@ const Customer = require('../models/Customer');
 // @access  Private
 const getJobs = async (req, res) => {
     try {
-        const jobs = await Job.find().sort({ createdAt: -1 });
-        res.json(jobs);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const search = req.query.search || '';
+        const filter = req.query.filter || 'all';
+        const hasOutsourced = req.query.hasOutsourced === 'true';
+
+        const query = {};
+
+        if (search) {
+            query.$or = [
+                { customerName: { $regex: search, $options: 'i' } },
+                { phone: { $regex: search, $options: 'i' } },
+                { jobId: { $regex: search, $options: 'i' } },
+                { device: { $regex: search, $options: 'i' } },
+                { model: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        if (filter !== 'all' && filter !== '') {
+            query.status = filter;
+        }
+
+        // Filter for jobs that have been outsourced (have outsourced.name field)
+        if (hasOutsourced) {
+            query['outsourced.name'] = { $exists: true, $ne: null, $ne: '' };
+        }
+
+        const count = await Job.countDocuments(query);
+        const jobs = await Job.find(query)
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .skip(limit * (page - 1));
+
+        res.json({
+            jobs,
+            page,
+            pages: Math.ceil(count / limit),
+            total: count
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -221,12 +258,15 @@ const getJobStats = async (req, res) => {
             .filter(job => job.status !== 'delivered')
             .reduce((sum, job) => sum + ((job.totalAmount || 0) - (job.advanceAmount || 0)), 0);
 
+        const totalCustomers = await Customer.countDocuments();
+
         res.json({
             total: jobs.length,
             today: todayJobs.length,
             statusCounts,
             totalEarnings,
             pendingPayments,
+            totalCustomers,
         });
 
     } catch (error) {
@@ -364,8 +404,19 @@ const getOutsourceStats = async (req, res) => {
 const getDetailedReports = async (req, res) => {
     try {
         const year = parseInt(req.query.year) || new Date().getFullYear();
-        const startDate = new Date(year, 0, 1);
-        const endDate = new Date(year, 11, 31, 23, 59, 59);
+        const month = parseInt(req.query.month); // Optional: 1-12
+
+        let startDate, endDate;
+
+        if (month) {
+            // Monthly report
+            startDate = new Date(year, month - 1, 1);
+            endDate = new Date(year, month, 0, 23, 59, 59);
+        } else {
+            // Yearly report
+            startDate = new Date(year, 0, 1);
+            endDate = new Date(year, 11, 31, 23, 59, 59);
+        }
 
         const jobs = await Job.find({
             createdAt: { $gte: startDate, $lte: endDate }
@@ -376,6 +427,8 @@ const getDetailedReports = async (req, res) => {
             month: new Date(0, i).toLocaleString('default', { month: 'short' }),
             totalOrders: 0,
             deliveredOrders: 0,
+            walkIn: 0,
+            homeService: 0,
             revenue: 0,
             outsourceCost: 0,
             profit: 0
@@ -384,33 +437,93 @@ const getDetailedReports = async (req, res) => {
         const yearlyStats = {
             totalOrders: 0,
             deliveredOrders: 0,
+            walkIn: 0,
+            homeService: 0,
             revenue: 0,
             outsourceCost: 0,
             profit: 0
         };
 
+        // Device category tracking
+        const deviceCounts = {};
+
+        // Customer tracking for top customers
+        const customerSpending = {};
+
         jobs.forEach(job => {
-            const month = new Date(job.createdAt).getMonth();
+            const jobMonth = new Date(job.createdAt).getMonth();
             const revenue = parseFloat(job.totalAmount) || 0;
             const outsourceCost = job.outsourced ? (parseFloat(job.outsourced.cost) || 0) : 0;
             const profit = revenue - outsourceCost;
+            const isWalkIn = job.type !== 'home-service';
 
-            // Update monthly
-            monthlyStats[month].totalOrders++;
-            if (job.status === 'delivered') monthlyStats[month].deliveredOrders++;
-            monthlyStats[month].revenue += revenue;
-            monthlyStats[month].outsourceCost += outsourceCost;
-            monthlyStats[month].profit += profit;
+            // Update monthly stats
+            monthlyStats[jobMonth].totalOrders++;
+            if (job.status === 'delivered') monthlyStats[jobMonth].deliveredOrders++;
+            if (isWalkIn) {
+                monthlyStats[jobMonth].walkIn++;
+            } else {
+                monthlyStats[jobMonth].homeService++;
+            }
+            monthlyStats[jobMonth].revenue += revenue;
+            monthlyStats[jobMonth].outsourceCost += outsourceCost;
+            monthlyStats[jobMonth].profit += profit;
 
-            // Update yearly
+            // Update yearly stats
             yearlyStats.totalOrders++;
             if (job.status === 'delivered') yearlyStats.deliveredOrders++;
+            if (isWalkIn) {
+                yearlyStats.walkIn++;
+            } else {
+                yearlyStats.homeService++;
+            }
             yearlyStats.revenue += revenue;
             yearlyStats.outsourceCost += outsourceCost;
             yearlyStats.profit += profit;
+
+            // Track device categories
+            const deviceType = job.deviceType || 'Other';
+            deviceCounts[deviceType] = (deviceCounts[deviceType] || 0) + 1;
+
+            // Track customer spending
+            const customerKey = `${job.customerName}|${job.phone}`;
+            if (!customerSpending[customerKey]) {
+                customerSpending[customerKey] = {
+                    name: job.customerName,
+                    phone: job.phone,
+                    orders: 0,
+                    totalSpent: 0
+                };
+            }
+            customerSpending[customerKey].orders++;
+            customerSpending[customerKey].totalSpent += revenue;
         });
 
-        res.json({ year, monthlyStats, yearlyStats });
+        // Prepare device breakdown for pie chart
+        const deviceBreakdown = Object.entries(deviceCounts)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+
+        // Service type breakdown
+        const serviceTypeBreakdown = [
+            { name: 'Walk-In', value: yearlyStats.walkIn },
+            { name: 'Home Service', value: yearlyStats.homeService }
+        ];
+
+        // Top 10 customers by spending
+        const topCustomers = Object.values(customerSpending)
+            .sort((a, b) => b.totalSpent - a.totalSpent)
+            .slice(0, 10);
+
+        res.json({
+            year,
+            month: month || null,
+            monthlyStats,
+            yearlyStats,
+            deviceBreakdown,
+            serviceTypeBreakdown,
+            topCustomers
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

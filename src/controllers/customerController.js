@@ -5,8 +5,73 @@ const Customer = require('../models/Customer');
 // @access  Private
 const getCustomers = async (req, res) => {
     try {
-        const customers = await Customer.find().sort({ createdAt: -1 });
-        res.json(customers);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const search = req.query.search || '';
+
+        const matchStage = {};
+        if (search) {
+            matchStage.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { phone: { $regex: search, $options: 'i' } },
+            ];
+        }
+
+        const pipeline = [
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'jobs',
+                    localField: 'phone',
+                    foreignField: 'phone',
+                    as: 'jobs'
+                }
+            },
+            {
+                $project: {
+                    name: 1,
+                    phone: 1,
+                    totalJobs: { $size: '$jobs' },
+                    lastVisit: { $max: '$jobs.createdAt' },
+                    totalSpent: { $sum: '$jobs.totalAmount' },
+                    pendingAmount: {
+                        $sum: {
+                            $map: {
+                                input: {
+                                    $filter: {
+                                        input: '$jobs',
+                                        as: 'job',
+                                        cond: { $ne: ['$$job.status', 'delivered'] }
+                                    }
+                                },
+                                as: 'job',
+                                in: { $subtract: [{ $ifNull: ['$$job.totalAmount', 0] }, { $ifNull: ['$$job.advanceAmount', 0] }] }
+                            }
+                        }
+                    },
+                    createdAt: 1 // for default sort
+                }
+            },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    metadata: [{ $count: "total" }],
+                    data: [{ $skip: limit * (page - 1) }, { $limit: limit }]
+                }
+            }
+        ];
+
+        const result = await Customer.aggregate(pipeline);
+
+        const customers = result[0].data;
+        const total = result[0].metadata[0] ? result[0].metadata[0].total : 0;
+
+        res.json({
+            customers,
+            page,
+            pages: Math.ceil(total / limit),
+            total
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

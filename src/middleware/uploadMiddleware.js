@@ -14,9 +14,19 @@ const storage = multer.diskStorage({
 });
 
 function checkFileType(file, cb) {
-    const filetypes = /jpg|jpeg|png/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
+    const filetypes = /jpg|jpeg|png|blob/; // Added blob to allowed "extensions" just in case, though it has no extension usually.
+    // Actually, path.extname('blob') is empty string.
+    // Let's just trust mimetype if filename is 'blob', or handle it gracefully.
+
+    // Better logic:
+    const filetypesRegex = /jpg|jpeg|png/;
+    const extname = filetypesRegex.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypesRegex.test(file.mimetype);
+
+    // If filename is 'blob', ignore extension check if mimetype is valid
+    if (file.originalname === 'blob' && mimetype) {
+        return cb(null, true);
+    }
 
     if (extname && mimetype) {
         return cb(null, true);
