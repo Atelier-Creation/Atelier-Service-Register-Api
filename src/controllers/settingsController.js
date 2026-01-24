@@ -55,4 +55,43 @@ const updateSettings = async (req, res) => {
     }
 };
 
-module.exports = { getSettings, updateSettings };
+// @desc    Update WhatsApp settings
+// @route   PUT /api/settings/whatsapp
+// @access  Private (Admin)
+const updateWhatsAppSettings = async (req, res) => {
+    try {
+        let settings = await Settings.findOne();
+        if (!settings) {
+            settings = new Settings();
+        }
+
+        const { enabled, otpVerification, statusNotifications, accessToken, phoneNumberId, businessAccountId, webhookVerifyToken } = req.body;
+
+        if (!settings.whatsapp) {
+            settings.whatsapp = {};
+        }
+
+        if (typeof enabled !== 'undefined') settings.whatsapp.enabled = enabled;
+        if (typeof otpVerification !== 'undefined') settings.whatsapp.otpVerification = otpVerification;
+        if (typeof statusNotifications !== 'undefined') settings.whatsapp.statusNotifications = statusNotifications;
+
+        if (accessToken) settings.whatsapp.accessToken = accessToken;
+        if (phoneNumberId) settings.whatsapp.phoneNumberId = phoneNumberId;
+        if (businessAccountId) settings.whatsapp.businessAccountId = businessAccountId;
+        if (webhookVerifyToken) settings.whatsapp.webhookVerifyToken = webhookVerifyToken;
+
+        const updatedSettings = await settings.save();
+
+        // Don't send accessToken back in response for security
+        const response = updatedSettings.toObject();
+        if (response.whatsapp && response.whatsapp.accessToken) {
+            response.whatsapp.accessToken = '***';
+        }
+
+        res.json(response);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+module.exports = { getSettings, updateSettings, updateWhatsAppSettings };

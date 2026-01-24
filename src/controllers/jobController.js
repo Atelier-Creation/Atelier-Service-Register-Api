@@ -1,5 +1,6 @@
 const Job = require('../models/Job');
 const Customer = require('../models/Customer');
+const whatsappService = require('../services/whatsappService');
 
 // @desc    Get all jobs
 // @route   GET /api/jobs
@@ -173,8 +174,19 @@ const updateJob = async (req, res) => {
             // Update fields (exclude immutable fields and statusHistory which is handled separately)
             const { _id, jobId, createdAt, statusHistory, ...updates } = req.body;
 
+            // Parse outsourced field if it's a JSON string (from FormData)
+            if (updates.outsourced && typeof updates.outsourced === 'string') {
+                try {
+                    updates.outsourced = JSON.parse(updates.outsourced);
+                } catch (e) {
+                    console.error('Failed to parse outsourced field:', e);
+                }
+            }
+
             // Track status change
+            let statusChanged = false;
             if (updates.status && updates.status !== job.status) {
+                statusChanged = true;
                 const historyEntry = {
                     status: updates.status,
                     timestamp: new Date(),
@@ -206,6 +218,17 @@ const updateJob = async (req, res) => {
             Object.assign(job, updates);
 
             const updatedJob = await job.save();
+
+            // Send WhatsApp Notifications
+            if (statusChanged) {
+                if (updatedJob.status === 'delivered') {
+                    await whatsappService.sendDeliveryNotification(updatedJob);
+                } else if (!['outsourced'].includes(updatedJob.status)) { // Don't notify for internal statuses like outsourced if preferred, or do. User said "customer specific".
+                    // User said: "received, in-progress, ready, returned, delivered".
+                    await whatsappService.sendStatusNotification(updatedJob);
+                }
+            }
+
             res.json(updatedJob);
         } else {
             res.status(404).json({ message: 'Job not found' });

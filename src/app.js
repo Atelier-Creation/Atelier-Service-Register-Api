@@ -24,4 +24,10 @@ app.use('/api/vendors', vendorRoutes);
 const settingsRoutes = require('./routes/settingsRoutes');
 app.use('/api/settings', settingsRoutes);
 
+const otpRoutes = require('./routes/otpRoutes');
+app.use('/api/otp', otpRoutes);
+
+const marketingRoutes = require('./routes/marketingRoutes');
+app.use('/api/marketing', marketingRoutes);
+
 module.exports = app;
