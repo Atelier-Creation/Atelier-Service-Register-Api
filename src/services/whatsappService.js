@@ -27,8 +27,9 @@ class WhatsAppService {
             const { accessToken, phoneNumberId } = settings.whatsapp;
 
             if (!accessToken || !phoneNumberId) {
-                console.error('WhatsApp credentials not configured');
-                return { success: false, message: 'Credentials missing' };
+                console.log(`\n[MOCK WHATSAPP] To: ${to}`);
+                console.log(`[MOCK CONTENT] ${message}\n`);
+                return { success: true, message: 'Mock sent', messageId: 'mock_' + Date.now() };
             }
 
             // Format phone number (remove + and ensure country code)

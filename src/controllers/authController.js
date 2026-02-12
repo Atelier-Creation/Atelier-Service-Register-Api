@@ -13,6 +13,7 @@ const generateToken = (id) => {
 // @access  Public
 const loginUser = async (req, res) => {
     const { username, password } = req.body;
+    console.log(`[AUTH] Login attempt for: ${username}`);
 
     if (!username || !password) {
         return res.status(400).json({ message: 'Please provide both username and password' });

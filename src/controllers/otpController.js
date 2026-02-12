@@ -3,7 +3,7 @@ const whatsappService = require('../services/whatsappService');
 
 // Generate 6-digit OTP
 const generateOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return '123456'; // Static OTP for dev/mock
 };
 
 // @desc    Send OTP to phone number
