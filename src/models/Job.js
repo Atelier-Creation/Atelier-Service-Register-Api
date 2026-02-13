@@ -92,6 +92,10 @@ const jobSchema = new mongoose.Schema({
         type: String, // e.g., "3 Months", "No Warranty"
         default: ""
     },
+    isWarranty: {
+        type: Boolean,
+        default: false
+    },
     paymentBreakdown: [{
         description: String,
         amount: Number

@@ -90,6 +90,12 @@ const createJob = async (req, res) => {
             advanceAmount,
             totalAmount,
             status,
+            warranty,
+            isWarranty,
+            type,
+            address,
+            visitDate,
+            note
         } = req.body;
 
         // Auto-generate sequential Job ID if not provided
@@ -131,10 +137,15 @@ const createJob = async (req, res) => {
             advanceAmount,
             totalAmount,
             status,
+            warranty,
+            isWarranty,
+            type,
+            address,
+            visitDate,
             statusHistory: [{
                 status: status || 'received',
                 timestamp: new Date(),
-                note: 'Order created'
+                note: note || 'Order created'
             }],
             images
         });
