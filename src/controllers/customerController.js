@@ -1,4 +1,15 @@
+const mongoose = require('mongoose');
 const Customer = require('../models/Customer');
+
+// Helper to cast branch ID for aggregation
+const castBranch = (branch) => {
+    if (!branch) return null;
+    if (typeof branch === 'string') return new mongoose.Types.ObjectId(branch);
+    if (branch.$in) {
+        return { $in: branch.$in.map(id => new mongoose.Types.ObjectId(id.toString())) };
+    }
+    return branch;
+};
 
 // @desc    Get all customers
 // @route   GET /api/customers
@@ -10,6 +21,10 @@ const getCustomers = async (req, res) => {
         const search = req.query.search || '';
 
         const matchStage = {};
+        if (req.currentBranch) {
+            matchStage.branch = castBranch(req.currentBranch);
+        }
+
         if (search) {
             matchStage.$or = [
                 { name: { $regex: search, $options: 'i' } },
@@ -22,8 +37,17 @@ const getCustomers = async (req, res) => {
             {
                 $lookup: {
                     from: 'jobs',
-                    localField: 'phone',
-                    foreignField: 'phone',
+                    let: { customerPhone: '$phone' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ['$phone', '$$customerPhone']
+                                }
+                            }
+                        },
+                        ...(req.currentBranch ? [{ $match: { branch: castBranch(req.currentBranch) } }] : [])
+                    ],
                     as: 'jobs'
                 }
             },

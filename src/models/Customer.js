@@ -15,6 +15,10 @@ const customerSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    branch: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Branch',
+    }
 }, {
     timestamps: true,
 });

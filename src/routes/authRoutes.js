@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { loginUser, registerUser, updateUserProfile, getUsers, createUser, deleteUser } = require('../controllers/authController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, adminOrBranchManager } = require('../middleware/authMiddleware');
 
 /**
  * @swagger
@@ -72,7 +72,7 @@ router.post('/login', loginUser);
  *                 type: string
  *               role:
  *                 type: string
- *                 enum: [admin, technician, staff]
+ *                 enum: [admin, technician, branch_manager]
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -114,7 +114,7 @@ router.put('/profile', protect, updateUserProfile);
  * @swagger
  * /api/auth/users:
  *   get:
- *     summary: Get all users (Admin only)
+ *     summary: Get all users (Admin/Branch Manager)
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
@@ -128,7 +128,7 @@ router.put('/profile', protect, updateUserProfile);
  *               items:
  *                 $ref: '#/components/schemas/User'
  *   post:
- *     summary: Create a new user (Admin only)
+ *     summary: Create a new user (Admin/Branch Manager)
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
@@ -154,11 +154,13 @@ router.put('/profile', protect, updateUserProfile);
  *                 type: string
  *               role:
  *                 type: string
+ *               branch:
+ *                 type: string
  *     responses:
  *       201:
  *         description: User created
  */
-router.route('/users').get(protect, getUsers).post(protect, createUser);
+router.route('/users').get(protect, adminOrBranchManager, getUsers).post(protect, adminOrBranchManager, createUser);
 
 /**
  * @swagger
@@ -178,6 +180,6 @@ router.route('/users').get(protect, getUsers).post(protect, createUser);
  *       200:
  *         description: User deleted
  */
-router.delete('/users/:id', protect, deleteUser);
+router.delete('/users/:id', protect, adminOrBranchManager, deleteUser);
 
 module.exports = router;

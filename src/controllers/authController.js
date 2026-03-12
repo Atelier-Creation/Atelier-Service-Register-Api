@@ -19,7 +19,7 @@ const loginUser = async (req, res) => {
         return res.status(400).json({ message: 'Please provide both username and password' });
     }
 
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username }).populate('branches', 'name code');
 
     if (user && (await user.matchPassword(password))) {
         res.json({
@@ -27,6 +27,8 @@ const loginUser = async (req, res) => {
             username: user.username,
             name: user.name,
             role: user.role,
+            branch: user.branches?.[0], // For backward compatibility in some frontend parts, or just send branches
+            branches: user.branches,
             token: generateToken(user._id),
         });
     } else {
@@ -104,31 +106,34 @@ const updateUserProfile = async (req, res) => {
 
 // @desc    Get all users
 // @route   GET /api/auth/users
-// @access  Private (Admin)
+// @access  Private (Admin or Branch Manager)
 const getUsers = async (req, res) => {
     try {
-        const users = await User.find({}).select('-password');
+        let query = {};
+        if (req.user.role === 'branch_manager') {
+            query.branches = { $in: req.user.branches };
+        }
+        const users = await User.find(query).select('-password').populate('branches', 'name code');
         res.json(users);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// @desc    Create a new user (Admin specific)
+// @desc    Create a new user (Admin or Branch Manager)
 // @route   POST /api/auth/users
-// @access  Private (Admin)
+// @access  Private (Admin or Branch Manager)
 const createUser = async (req, res) => {
     try {
-        const { username, password, name, role } = req.body;
+        let { username, password, name, role, branch, branches } = req.body;
 
-        // Check limit: 1 non-admin user allowed
-        // Only enforce limit if trying to create non-admin, or maybe strictly enforce 1 extra account regardless of role?
-        // "admin can create only 1 user account".
-        const existingStaff = await User.countDocuments({ role: { $ne: 'admin' } });
-
-        // If we want to be strict: 
-        if (role !== 'admin' && existingStaff >= 1) {
-            return res.status(400).json({ message: 'User limit reached. Only 1 additional user account is allowed.' });
+        if (req.user.role === 'branch_manager') {
+            role = 'technician';
+            branches = req.user.branches;
+        } else if (req.user.role === 'admin') {
+            role = role || 'technician';
+            // handle both single branch and multiple branches from frontend
+            if (!branches && branch) branches = [branch];
         }
 
         const userExists = await User.findOne({ username });
@@ -140,16 +145,13 @@ const createUser = async (req, res) => {
             username,
             password,
             name,
-            role: role || 'technician',
+            role,
+            branches: branches || [],
         });
 
         if (user) {
-            res.status(201).json({
-                _id: user._id,
-                username: user.username,
-                name: user.name,
-                role: user.role,
-            });
+            const populatedUser = await User.findById(user._id).select('-password').populate('branches', 'name code');
+            res.status(201).json(populatedUser);
         }
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -158,7 +160,7 @@ const createUser = async (req, res) => {
 
 // @desc    Delete user
 // @route   DELETE /api/auth/users/:id
-// @access  Private (Admin)
+// @access  Private (Admin or Branch Manager)
 const deleteUser = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
@@ -166,6 +168,14 @@ const deleteUser = async (req, res) => {
         if (user) {
             if (user.role === 'admin') {
                 return res.status(400).json({ message: 'Cannot delete admin user' });
+            }
+            if (req.user.role === 'branch_manager') {
+                if (user.branch.toString() !== req.user.branch.toString()) {
+                     return res.status(401).json({ message: 'Not authorized to delete this user' });
+                }
+                if (user.role === 'branch_manager') {
+                     return res.status(400).json({ message: 'Branch manager cannot delete another branch manager' });
+                }
             }
             await user.deleteOne();
             res.json({ message: 'User removed' });

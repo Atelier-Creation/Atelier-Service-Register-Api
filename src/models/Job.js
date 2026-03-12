@@ -100,6 +100,10 @@ const jobSchema = new mongoose.Schema({
         description: String,
         amount: Number
     }],
+    branch: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Branch',
+    }
 }, {
     timestamps: true,
 });

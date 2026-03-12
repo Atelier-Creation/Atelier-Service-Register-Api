@@ -23,6 +23,8 @@ const vendorRoutes = require('./routes/vendorRoutes');
 app.use('/api/vendors', vendorRoutes);
 const settingsRoutes = require('./routes/settingsRoutes');
 app.use('/api/settings', settingsRoutes);
+const branchRoutes = require('./routes/branchRoutes');
+app.use('/api/branches', branchRoutes);
 
 const otpRoutes = require('./routes/otpRoutes');
 app.use('/api/otp', otpRoutes);

@@ -17,9 +17,13 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'technician'],
+        enum: ['admin', 'branch_manager', 'technician'],
         default: 'technician',
     },
+    branches: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Branch',
+    }],
 }, {
     timestamps: true,
 });

@@ -15,6 +15,10 @@ const getJobs = async (req, res) => {
 
         const query = {};
 
+        if (req.currentBranch) {
+            query.branch = req.currentBranch;
+        }
+
         if (search) {
             query.$or = [
                 { customerName: { $regex: search, $options: 'i' } },
@@ -36,6 +40,7 @@ const getJobs = async (req, res) => {
 
         const count = await Job.countDocuments(query);
         const jobs = await Job.find(query)
+            .populate('branch', 'name')
             .sort({ createdAt: -1 })
             .limit(limit)
             .skip(limit * (page - 1));
@@ -56,7 +61,10 @@ const getJobs = async (req, res) => {
 // @access  Private
 const getJobById = async (req, res) => {
     try {
-        const job = await Job.findOne({ jobId: req.params.id });
+        const query = { jobId: req.params.id };
+        if (req.currentBranch) query.branch = req.currentBranch;
+        
+        const job = await Job.findOne(query).populate('branch', 'name');
         if (job) {
             res.json(job);
         } else {
@@ -147,7 +155,8 @@ const createJob = async (req, res) => {
                 timestamp: new Date(),
                 note: note || 'Order created'
             }],
-            images
+            images,
+            branch: req.currentBranch || req.user?.branch // use constrained branch
         });
 
         const createdJob = await job.save();
@@ -164,6 +173,7 @@ const createJob = async (req, res) => {
                 name: customerName,
                 phone,
                 totalJobs: 1,
+                branch: req.currentBranch || req.user?.branch
             });
             await newCustomer.save();
         }
@@ -179,7 +189,10 @@ const createJob = async (req, res) => {
 // @access  Private
 const updateJob = async (req, res) => {
     try {
-        const job = await Job.findOne({ jobId: req.params.id });
+        const query = { jobId: req.params.id };
+        if (req.currentBranch) query.branch = req.currentBranch;
+
+        const job = await Job.findOne(query);
 
         if (job) {
             // Update fields (exclude immutable fields and statusHistory which is handled separately)
@@ -254,7 +267,10 @@ const updateJob = async (req, res) => {
 // @access  Private (Admin)
 const deleteJob = async (req, res) => {
     try {
-        const job = await Job.findOne({ jobId: req.params.id });
+        const query = { jobId: req.params.id };
+        if (req.currentBranch) query.branch = req.currentBranch;
+
+        const job = await Job.findOne(query);
 
         if (job) {
             await job.deleteOne();
@@ -272,7 +288,10 @@ const deleteJob = async (req, res) => {
 // @access  Private
 const getJobStats = async (req, res) => {
     try {
-        const jobs = await Job.find({});
+        const query = {};
+        if (req.currentBranch) query.branch = req.currentBranch;
+        
+        const jobs = await Job.find(query);
 
         const today = new Date().toDateString();
         const todayJobs = jobs.filter(job =>
@@ -292,7 +311,9 @@ const getJobStats = async (req, res) => {
             .filter(job => job.status !== 'delivered')
             .reduce((sum, job) => sum + ((job.totalAmount || 0) - (job.advanceAmount || 0)), 0);
 
-        const totalCustomers = await Customer.countDocuments();
+        const custQuery = {};
+        if (req.currentBranch) custQuery.branch = req.currentBranch;
+        const totalCustomers = await Customer.countDocuments(custQuery);
 
         res.json({
             total: jobs.length,
@@ -334,12 +355,15 @@ const getDashboardCharts = async (req, res) => {
             labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         }
 
-        const jobs = await Job.find({
+        const query = {
             createdAt: {
                 $gte: startDate,
                 $lte: endDate
             }
-        });
+        };
+        if (req.currentBranch) query.branch = req.currentBranch;
+
+        const jobs = await Job.find(query);
 
         const chartData = labels.map((label, index) => {
             let periodJobs;
@@ -388,10 +412,13 @@ const getDashboardCharts = async (req, res) => {
 // @access  Private
 const getOutsourceStats = async (req, res) => {
     try {
-        const jobs = await Job.find({
+        const query = {
             status: { $in: ['outsourced', 'ready', 'delivered'] },
             'outsourced.name': { $exists: true, $ne: '' }
-        });
+        };
+        if (req.currentBranch) query.branch = req.currentBranch;
+        
+        const jobs = await Job.find(query);
 
         const vendorStats = {};
 
@@ -452,9 +479,12 @@ const getDetailedReports = async (req, res) => {
             endDate = new Date(year, 11, 31, 23, 59, 59);
         }
 
-        const jobs = await Job.find({
+        const query = {
             createdAt: { $gte: startDate, $lte: endDate }
-        });
+        };
+        if (req.currentBranch) query.branch = req.currentBranch;
+
+        const jobs = await Job.find(query);
 
         // Initialize monthly stats
         const monthlyStats = Array.from({ length: 12 }, (_, i) => ({
